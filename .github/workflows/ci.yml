@@ -1,4 +1,4 @@
-name: CI
+name: CI/CD
 
 on:
   push:
@@ -9,7 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out code
         uses: actions/checkout@v5
@@ -23,3 +22,24 @@ jobs:
 
       - name: Build and test with Maven
         run: ./mvnw clean package
+
+  deploy:
+    needs: build
+    runs-on: self-hosted
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Build Docker image
+        run: docker build -t devops-demo:1.0 .
+
+      - name: Import image into containerd
+        run: |
+          docker save devops-demo:1.0 -o /tmp/devops-demo.tar
+          sudo ctr -n k8s.io images import /tmp/devops-demo.tar
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl apply -f k8s/
+          kubectl rollout restart deployment/devops-demo
+          kubectl rollout status deployment/devops-demo
